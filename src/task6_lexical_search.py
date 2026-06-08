@@ -70,6 +70,34 @@ def lexical_search(query: str, top_k: int = 10) -> list[dict]:
             })
     return results
 
+def tfidf_lexical_search(query: str, top_k: int = 10) -> list[dict]:
+    """
+    Tìm kiếm từ khóa sử dụng TF-IDF (cho bonus).
+    """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    
+    if not CORPUS:
+        return []
+        
+    corpus_texts = [doc["content"] for doc in CORPUS]
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(corpus_texts)
+    query_vec = vectorizer.transform([query])
+    
+    scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    
+    results = []
+    for idx in top_indices:
+        if scores[idx] > 0:
+            results.append({
+                "content": CORPUS[idx]["content"],
+                "score": float(scores[idx]),
+                "metadata": CORPUS[idx]["metadata"]
+            })
+    return results
+
 
 if __name__ == "__main__":
     # Test

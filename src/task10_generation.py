@@ -118,41 +118,17 @@ def format_context(chunks: list[dict]) -> str:
 # GENERATION
 # =============================================================================
 
-def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
+def generate_answer_from_chunks(query: str, chunks: list[dict]) -> str:
     """
-    End-to-end RAG generation có citation.
-
-    Pipeline:
-        1. Retrieve relevant chunks
-        2. Reorder để tránh lost in the middle
-        3. Format context với source labels
-        4. Build prompt (system + context + query)
-        5. Call LLM
-        6. Return answer + sources
-
-    Args:
-        query: Câu hỏi của user
-
-    Returns:
-        {
-            'answer': str,           # Câu trả lời có citation
-            'sources': list[dict],   # Các chunks đã dùng
-            'retrieval_source': str  # 'hybrid' hoặc 'pageindex'
-        }
+    Tạo câu trả lời bằng LLM từ list chunks đã được cung cấp (thường là sau khi đã reorder).
+    Nếu không có chunks, trả về câu thông báo mặc định an toàn.
     """
-    # Step 1: Retrieve
-    chunks = retrieve(query, top_k=top_k)
-
-    # Step 2: Reorder
-    reordered = reorder_for_llm(chunks)
-
-    # Step 3: Format context
-    context = format_context(reordered)
-
-    # Step 4: Build prompt
+    if not chunks:
+        return "Tôi không thể xác minh thông tin này từ nguồn hiện có."
+        
+    context = format_context(chunks)
     user_message = f"Context:\n{context}\n\n---\n\nQuestion: {query}"
-
-    # Step 5: Call LLM
+    
     from openai import OpenAI
     import requests
     
@@ -196,19 +172,65 @@ def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
             if resp.status_code == 200:
                 answer = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             else:
-                answer = f"Error calling Gemini API: {resp.text}"
+                print(f"  ⚠ Gemini API failed (HTTP {resp.status_code}): {resp.text}")
+                answer = None
         except Exception as e:
-            answer = f"Error calling Gemini API: {e}"
+            print(f"  ⚠ Gemini API exception: {e}")
+            answer = None
 
     if answer is None:
-        answer = "Mock answer: Tôi không thể xác minh thông tin này từ nguồn hiện có. (Missing API Keys or both failed) [Mock Source, Điều 1]"
+        answer = "Tôi không thể xác minh thông tin này từ nguồn hiện có do lỗi kết nối hệ thống (hoặc API đang quá tải)."
+
+    return answer
+
+
+def generate_with_citation(query: str, top_k: int = TOP_K) -> dict:
+    """
+    End-to-end RAG generation có citation.
+
+    Pipeline:
+        1. Retrieve relevant chunks
+        2. Reorder để tránh lost in the middle
+        3. Format context với source labels
+        4. Build prompt (system + context + query)
+        5. Call LLM
+        6. Return answer + sources
+
+    Args:
+        query: Câu hỏi của user
+
+    Returns:
+        {
+            'answer': str,           # Câu trả lời có citation
+            'sources': list[dict],   # Các chunks đã dùng
+            'retrieval_source': str  # 'hybrid' hoặc 'pageindex'
+        }
+    """
+    # Step 1: Retrieve
+    chunks = retrieve(query, top_k=top_k)
+
+    # Step 2: Reorder
+    reordered = reorder_for_llm(chunks)
+
+    # Step 3, 4, 5: Format context & Call LLM
+    answer = generate_answer_from_chunks(query, reordered)
 
     # Step 6: Return
     return {
         "answer": answer,
-        "sources": chunks,
-        "retrieval_source": chunks[0].get("source", "hybrid") if chunks else "none"
+        "sources": reordered,
+        "retrieval_source": "hybrid" if chunks and chunks[0].get("source") != "pageindex" else "pageindex"
     }
+
+
+def _offline_answer(query: str, chunks: list[dict]) -> str:
+    """
+    Offline/local generator for evaluation.
+    Just extracts a snippet from the first chunk to simulate a generated answer.
+    """
+    if not chunks:
+        return "Tôi không thể xác minh thông tin này từ nguồn hiện có."
+    return chunks[0].get("content", "")[:200] + "..."
 
 
 if __name__ == "__main__":

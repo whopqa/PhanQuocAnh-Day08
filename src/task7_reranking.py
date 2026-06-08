@@ -12,6 +12,8 @@ Nếu dùng MMR hoặc RRF, đảm bảo hiểu và giải thích được cơ c
 from typing import Optional
 
 
+_cross_encoder_model = None
+
 def rerank_cross_encoder(
     query: str, candidates: list[dict], top_k: int = 5
 ) -> list[dict]:
@@ -26,12 +28,15 @@ def rerank_cross_encoder(
     Returns:
         List of top_k candidates, re-scored và sorted by rerank_score descending.
     """
+    global _cross_encoder_model
     from sentence_transformers import CrossEncoder
 
     try:
-        model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+        if _cross_encoder_model is None:
+            _cross_encoder_model = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+            
         pairs = [[query, c["content"]] for c in candidates]
-        scores = model.predict(pairs)
+        scores = _cross_encoder_model.predict(pairs)
         
         results = []
         for i, c in enumerate(candidates):
@@ -102,14 +107,21 @@ def rerank_rrf(
     ranked_lists: list[list[dict]], top_k: int = 5, k: int = 60
 ) -> list[dict]:
     """
-    Reciprocal Rank Fusion — gộp kết quả từ nhiều ranker.
-
-    RRF(d) = Σ 1 / (k + rank_r(d))
+    Rerank kết hợp các list kết quả sử dụng Reciprocal Rank Fusion (RRF).
+    
+    GIẢI THÍCH LÝ DO DÙNG RRF:
+    RRF là một thuật toán để trộn kết quả từ nhiều hệ thống tìm kiếm khác nhau 
+    (như semantic search và lexical search) bằng cách sử dụng thứ hạng (rank) 
+    thay vì điểm số thô. Lý do là vì điểm cosine similarity và điểm BM25 có 
+    phân phối và thang đo khác biệt (điểm cosine từ 0 đến 1, trong khi điểm 
+    BM25 có thể lên tới vài chục hoặc hàng trăm).
+    RRF tính điểm cho từng tài liệu = 1 / (k + rank), với k là một hằng số 
+    (thường = 60). Tài liệu đứng đầu có điểm lớn nhất, giảm dần theo thứ hạng.
 
     Args:
         ranked_lists: List of ranked result lists (mỗi list từ 1 ranker)
-        top_k: Số lượng kết quả cuối cùng
-        k: Smoothing constant (default=60, từ paper Cormack et al. 2009)
+        top_k: Số lượng kết quả trả về
+        k: Hằng số K trong công thức RRF (thường = 60)
 
     Returns:
         List of top_k candidates sorted by RRF score descending.

@@ -81,8 +81,8 @@ def retrieve(
 
     # Step 4: Check threshold → fallback
     if not final_results or final_results[0]["score"] < score_threshold:
-        print(f"  ⚠ Hybrid score ({final_results[0]['score']:.3f} if final_results else 0) "
-              f"< threshold ({score_threshold}). Fallback → PageIndex")
+        print(f"  [WARNING] Hybrid score ({final_results[0]['score']:.3f} if final_results else 0) "
+              f"is lower than threshold {score_threshold}. Fallback → PageIndex")
         fallback = pageindex_search(query, top_k=top_k)
         if fallback:
             return fallback

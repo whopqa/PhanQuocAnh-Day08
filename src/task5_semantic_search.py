@@ -10,6 +10,10 @@ Yêu cầu:
 """
 
 
+_semantic_model = None
+_data_store = None
+_embeddings = None
+
 def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     """
     Tìm kiếm ngữ nghĩa sử dụng vector similarity.
@@ -31,26 +35,29 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     from pathlib import Path
     from sentence_transformers import SentenceTransformer
     import sys
+    
+    global _semantic_model, _data_store, _embeddings
 
-    # Load data store and embeddings
-    DATA_DIR = Path(__file__).parent.parent / "data"
-    try:
-        with open(DATA_DIR / "vector_store.json", "r", encoding="utf-8") as f:
-            data_store = json.load(f)
-        embeddings = np.load(DATA_DIR / "vector_store_embeddings.npy")
-    except FileNotFoundError:
-        return []
+    if _semantic_model is None:
+        DATA_DIR = Path(__file__).parent.parent / "data"
+        try:
+            with open(DATA_DIR / "vector_store.json", "r", encoding="utf-8") as f:
+                _data_store = json.load(f)
+            _embeddings = np.load(DATA_DIR / "vector_store_embeddings.npy")
+        except FileNotFoundError:
+            return []
 
-    # Model parameters must match Task 4
-    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    query_embedding = model.encode([query])[0]
+        # Model parameters must match Task 4
+        _semantic_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        
+    query_embedding = _semantic_model.encode([query])[0]
 
     # Calculate cosine similarity
     # We can use dot product if embeddings are normalized, otherwise cosine sim formula:
     query_norm = np.linalg.norm(query_embedding)
-    embeddings_norm = np.linalg.norm(embeddings, axis=1)
+    embeddings_norm = np.linalg.norm(_embeddings, axis=1)
     
-    similarities = np.dot(embeddings, query_embedding) / (embeddings_norm * query_norm)
+    similarities = np.dot(_embeddings, query_embedding) / (embeddings_norm * query_norm)
     
     # Get top_k indices
     top_indices = np.argsort(similarities)[::-1][:top_k]
@@ -58,9 +65,9 @@ def semantic_search(query: str, top_k: int = 10) -> list[dict]:
     results = []
     for idx in top_indices:
         results.append({
-            "content": data_store[idx]["content"],
+            "content": _data_store[idx]["content"],
             "score": float(similarities[idx]),
-            "metadata": data_store[idx]["metadata"]
+            "metadata": _data_store[idx]["metadata"]
         })
         
     return results

@@ -35,15 +35,35 @@ STANDARDIZED_DIR = Path(__file__).parent.parent / "data" / "standardized"
 # CONFIGURATION — Giải thích lựa chọn của bạn trong comment
 # =============================================================================
 
+# Tại sao chọn CHUNK_SIZE = 500?
+# - Dữ liệu luật pháp và tin tức thường có cấu trúc câu dài vừa phải. 500 ký tự
+#   đảm bảo giữ được khoảng 1-2 đoạn văn trọn vẹn ý nghĩa, giúp Embedding model
+#   không bị nhiễu bởi quá nhiều thông tin không liên quan.
 CHUNK_SIZE = 500
+
+# Tại sao chọn CHUNK_OVERLAP = 50?
+# - Overlap 50 ký tự (khoảng 10-15 từ) để đảm bảo các từ khóa kết nối giữa hai
+#   đoạn chunk không bị cắt đứt, giúp duy trì ngữ cảnh liền mạch cho LLM.
 CHUNK_OVERLAP = 50
+
+# Tại sao chọn CHUNKING_METHOD = "recursive"?
+# - RecursiveCharacterTextSplitter tách văn bản dần dần từ paragraph -> sentence -> word,
+#   đây là cách an toàn và tự nhiên nhất để không làm vỡ cấu trúc câu ngữ pháp, 
+#   đặc biệt hữu ích khi xử lý tài liệu markdown.
 CHUNKING_METHOD = "recursive"
 
-# Dùng model nhẹ để test nhanh
+# Tại sao chọn model này?
+# - "all-MiniLM-L6-v2" là model rất nhẹ (chỉ tốn khoảng 80MB dung lượng), chạy cực
+#   kỳ nhanh trên CPU nhưng vẫn cho ra chất lượng embedding 384-chiều rất tốt cho
+#   tác vụ semantic search cơ bản.
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
 
-VECTOR_STORE = "numpy_local"
+# Tại sao chọn vector store local_numpy?
+# - Không cần setup server cồng kềnh như Weaviate hay FAISS cho một bài lab nhỏ.
+#   Numpy array cho tốc độ đủ nhanh (O(N) brute-force) với dữ liệu quy mô nhỏ (vài nghìn chunks),
+#   việc lưu trữ và load lại qua file .npy rất dễ dàng.
+VECTOR_STORE = "local_numpy"
 
 
 # =============================================================================

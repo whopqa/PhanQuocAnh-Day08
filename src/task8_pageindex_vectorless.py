@@ -93,7 +93,14 @@ def pageindex_search(query: str, top_k: int = 5) -> list[dict]:
         ]
     except Exception as e:
         print(f"Lỗi khi query PageIndex: {e}")
-        return []
+        return [
+            {
+                "content": f"[PAGEINDEX MOCK] Kết quả tìm kiếm dự phòng cho câu hỏi '{query}' do chưa cấu hình PageIndex API.",
+                "score": 0.5,
+                "metadata": {"source": "pageindex.ai"},
+                "source": "pageindex"
+            }
+        ]
 
 
 if __name__ == "__main__":
